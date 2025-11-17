@@ -218,17 +218,19 @@ button:disabled {
   margin-bottom: 8px;
 }
 /* ======================================================
-   QUIZ MODAL
+   QUIZ MODAL (PERBAIKAN: Centering + Transisi)
 ====================================================== */
 dialog::backdrop {
   background: rgba(0,0,0,0.6);
   backdrop-filter: blur(3px);
 }
+
 dialog {
   border: none;
   padding: 0;
-  animation: popIn 0.25s ease;
+  /* HAPUS 'animation: popIn' dari sini karena bentrok */
 }
+
 #quizModal {
   background: var(--bg-medium);
   color: var(--text-light);
@@ -237,16 +239,41 @@ dialog {
   width: 380px;
   max-width: 90vw;
   border: 1px solid rgba(255,255,255,0.1);
+
+  /* --- TAMBAHAN UNTUK CENTERING & ANIMASI BARU --- */
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  
+  /* State Awal (tersembunyi & kecil) */
+  /* Kita gabungkan translate (centering) dan scale (animasi) */
+  transform: translate(-50%, -50%) scale(0.9);
+  opacity: 0;
+  visibility: hidden;
+  
+  /* Transisi yang akan menggantikan @keyframes */
+  transition: opacity 0.2s ease, transform 0.2s ease, visibility 0.2s;
+  z-index: 1000; /* Memastikan di atas segalanya */
 }
+
+/* State Saat Terbuka (dipicu oleh .showModal()) */
+#quizModal[open] {
+  transform: translate(-50%, -50%) scale(1);
+  opacity: 1;
+  visibility: visible;
+}
+
 #quizQuestion {
   font-size: 18px;
   margin-bottom: 20px;
 }
+
 #quizChoices {
   display: grid;
   gap: 10px;
   margin-bottom: 20px;
 }
+
 #quizChoices label {
   display: flex;
   gap: 12px;
@@ -256,10 +283,13 @@ dialog {
   background: rgba(255,255,255,0.05);
   cursor: pointer;
 }
-@keyframes popIn {
+
+/* HAPUS @keyframes popIn karena sudah diganti transition */
+/* @keyframes popIn {
   from { opacity:0; transform:scale(0.9); }
   to   { opacity:1; transform:scale(1); }
-}
+} 
+*/
 /* ======================================================
    EDU POPUP
 ====================================================== */

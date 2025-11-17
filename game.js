@@ -457,9 +457,20 @@ function movePlayerAnimated(player, steps) {
 // --- handleQuiz (MODIFIKASI) ---
 async function handleQuiz(player) {
   const level = player.level || 1; // default level 1
-  const bank = currentQuizLevels[level];
+  
+  // --- FIX START: Cek bank soal mana yang akan digunakan ---
+  let bank;
+  if (currentQuizLevels) {
+    // Jika kategori ini punya 'quizLevels' (seperti 'Uang Saku'), gunakan itu
+    bank = currentQuizLevels[level];
+  } else {
+    // Jika tidak ada, gunakan 'quizBank' (sistem lama/fallback)
+    bank = currentQuizBank;
+  }
+  // --- FIX END ---
 
   if (!bank || bank.length === 0) {
+    // Pengecekan ini sekarang aman dan berfungsi untuk kedua sistem
     toast("Tidak ada soal untuk level ini.");
     return;
   }
@@ -471,6 +482,7 @@ async function handleQuiz(player) {
     return;
   }
 
+  // Sisa kodenya sama...
   const item = bank.find(q => q.q === quizQuestion.textContent);
 
   if (!item) {
@@ -479,8 +491,12 @@ async function handleQuiz(player) {
   }
 
   if (ans === item.correct) {
-    // bonus berdasarkan level
-    const bonus = level === 1 ? 15000 : level === 2 ? 8000 : 5000;
+    
+    // --- PERBAIKAN TAMBAHAN: Gunakan konstanta Anda! ---
+    // Daripada hardcode bonus, panggil konstanta yang sudah Anda buat
+    const bonus = BONUS_BY_LEVEL[level] || BONUS_BY_LEVEL[1]; // fallback ke bonus level 1
+    // --- AKHIR PERBAIKAN ---
+
     player.points += bonus;
     toast(`${player.name}: Jawaban benar! +${bonus.toLocaleString("id-ID")} Poin`);
   } else {
