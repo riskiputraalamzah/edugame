@@ -8,7 +8,7 @@
         "tax": "Iuran/pajak adalah kontribusi kecil untuk kegiatan bersama, seperti kebersihan kelas.",
         "save": "Menabung membuatmu siap untuk kebutuhan penting di masa depan.",
         "penalty": "Denda muncul ketika kamu lupa mengatur keuangan atau telat membayar kewajiban.",
-        "bonus": "Bonus! Jawab pertanyaan keuangan untuk menambah wawasan dan poin.",
+        "bonus": "",
         "start": "START! Kamu mendapatkan semangat awal berupa bonus poin."
       },
       "tiles": [
@@ -417,7 +417,7 @@
         "tax": "Kontribusikan energimu untuk membantu lingkungan digital tetap aman.",
         "save": "Kamu menyimpan kebiasaan positif. Kebiasaan baik membuat reputasimu meningkat.",
         "penalty": "Perilaku tidak pantas menyebabkan masalah. Hati-hati saat bertindak di dunia digital.",
-        "bonus": "Bonus kuis etika digital! Jawab dengan benar untuk dapat poin tambahan."
+        "bonus": ""
       },
       "tiles": [
         {
@@ -818,7 +818,7 @@
         "tax": "Kamu ikut berkontribusi menjaga kenyamanan dan kebersihan lingkungan bersama.",
         "save": "Menjaga sikap baik secara konsisten akan membantumu menjadi pribadi yang disukai.",
         "penalty": "Perilaku buruk membawa konsekuensi, tapi kamu bisa belajar dari kesalahan.",
-        "bonus": "Bonus adab! Jawab kuis tentang etika & sopan santun untuk mendapat poin.",
+        "bonus": "",
         "start": "START! Awali perjalananmu dengan sikap sopan dan bertanggung jawab."
       },
       "tiles": [
@@ -1220,7 +1220,7 @@
         "tax": "Setiap usaha harus membayar pajak untuk mendukung fasilitas dan infrastruktur umum.",
         "save": "Menyisihkan sebagian keuntungan dapat menjadi modal pengembangan usaha di masa depan.",
         "penalty": "Kerugian muncul karena kesalahan dalam mengatur usaha. Dari sini kita belajar memperbaiki strategi.",
-        "bonus": "Jawab kuis wirausaha! Setiap jawaban benar meningkatkan pengetahuan bisnis.",
+        "bonus": "",
         "start": "START! Awal perjalananmu dalam membangun usaha yang sukses."
       },
       "tiles": [
@@ -1627,7 +1627,7 @@
         "tax": "Sebagian energi kamu dipakai untuk aktivitas rutin harian. Ini wajar dan perlu dikelola.",
         "save": "Menyimpan energi atau waktu untuk beristirahat membuat tubuh tetap bugar.",
         "penalty": "Kurang istirahat, stres, atau makan sembarangan membuatmu kehilangan poin.",
-        "bonus": "Bonus kuis tentang hidup sehat! Jawab dengan benar untuk poin tambahan.",
+        "bonus": "",
         "start": "START! Awali harimu dengan semangat dan pola hidup sehat!"
       },
       "tiles": [
@@ -2029,7 +2029,7 @@
         "tax": "Kamu mengikuti aturan dan kebijakan digital demi keamanan bersama.",
         "save": "Kamu menyimpan data dan kebiasaan digital yang sehat.",
         "penalty": "Kamu terkena konsekuensi dari tindakan digital yang tidak aman.",
-        "bonus": "Bonus! Jawab kuis tentang keamanan dan kesehatan digital.",
+        "bonus": "",
         "start": "START! Awal perjalanan digital sehat dan aman."
       },
       "tiles": [

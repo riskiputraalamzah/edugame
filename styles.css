@@ -290,26 +290,7 @@ dialog {
   to   { opacity:1; transform:scale(1); }
 } 
 */
-/* ======================================================
-   EDU POPUP
-====================================================== */
-.edu-popup {
-  position: fixed;
-  bottom: 24px;
-  left: 50%;
-  transform: translateX(-50%);
-  background: var(--bg-medium);
-  padding: 12px 18px;
-  border-radius: 12px;
-  opacity: 0;
-  transition: 0.3s;
-  pointer-events: none;
-  font-size: 14px;
-}
-.edu-popup.show {
-  opacity: 1;
-  bottom: 32px;
-}
+
 /* ======================================================
    RESPONSIVE
 ====================================================== */
@@ -447,6 +428,7 @@ dialog {
   display: none; /* Sembunyikan dropdown lama */
 }
 
+/* GANTI STYLE .notif-popup LAMA DENGAN INI */
 .notif-popup {
   position: fixed;
   top: 50%;
@@ -456,18 +438,34 @@ dialog {
   background: rgba(0, 0, 0, 0.85);
   color: #fff;
   border-radius: 14px;
-  font-size: 22px;
-  font-weight: 600;
   text-align: center;
   z-index: 5000;
   opacity: 0;
   pointer-events: none;
   transition: opacity .25s ease, transform .25s ease;
+
+  /* --- Perubahan Baru --- */
+  width: 500px; /* Beri lebar agar teks edukasi muat */
+  max-width: 90vw;
 }
 
 .notif-popup.show {
   opacity: 1;
   transform: translate(-50%, -50%) scale(1);
+}
+
+/* --- Style untuk 2 baris --- */
+.notif-popup span {
+  font-size: 22px;
+  font-weight: 600;
+  display: block; /* Baris pertama */
+}
+.notif-popup small {
+  font-size: 14px;
+  font-weight: 400;
+  opacity: 0.8;
+  margin-top: 10px;
+  display: block; /* Baris kedua */
 }
 /* ========== NOTIF DI DALAM QUIZ MODAL ========== */
 .modal-notif {

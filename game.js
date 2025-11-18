@@ -236,44 +236,64 @@ window.addEventListener("resize", () => {
 function rollDice() { return Math.floor(Math.random() * 6) + 1; }
 function applyStartBonus(player) { player.points += 10000; showInModalOrNotif(`${player.name} melewati START: +10.000 Poin`); }
 
+
+// GANTI TOTAL FUNGSI INI
 function resolveTile(player) {
   const tile = currentTiles[player.pos % currentTiles.length];
-  showEdu(tile.type);
+  const eduText = currentEduText[tile.type] || ""; // Ambil teks edukasi
+
+  let pointMessage = ""; 
+  let runQuiz = false; 
+
   switch (tile.type) {
     case T.INCOME:
       player.points += tile.points;
-      showInModalOrNotif(`${player.name}: ${tile.title} ${toPoinStr(tile.points)}`);
+      pointMessage = `${player.name}: ${tile.title} ${toPoinStr(tile.points)}`;
       break;
     case T.EXPENSE:
       player.points += tile.points;
-      showInModalOrNotif(`${player.name}: ${tile.title} ${toPoinStr(tile.points)}`);
+      pointMessage = `${player.name}: ${tile.title} ${toPoinStr(tile.points)}`;
       break;
     case T.TAX: {
       const cut = Math.floor(player.points * (tile.percent / 100));
       player.points -= cut;
-      showInModalOrNotif(`${player.name}: Bayar ${tile.title} ${toPoinStr(-cut)}`);
+      pointMessage = `${player.name}: Bayar ${tile.title} ${toPoinStr(-cut)}`;
       break;
     }
     case T.SAVE:
       if (player.points >= tile.points) {
         player.points -= tile.points;
         player.savingsPoints += tile.points;
-        showInModalOrNotif(`${player.name}: Menabung ${toPoinStr(tile.points)}`);
+        pointMessage = `${player.name}: Menabung ${toPoinStr(tile.points)}`;
       } else {
-        showInModalOrNotif(`${player.name}: Poin kurang untuk menabung.`);
+        pointMessage = `${player.name}: Poin kurang untuk menabung.`;
       }
       break;
     case T.BONUS:
-      showInModalOrNotif(`${player.name}: ${tile.title}!`);
-      handleQuiz(player);
+      pointMessage = `${player.name}: ${tile.title}!`;
+      runQuiz = true; 
       break;
     case T.PENALTY:
       player.points += tile.points;
-      showInModalOrNotif(`${player.name}: Denda ${tile.title} ${toPoinStr(tile.points)}`);
+      pointMessage = `${player.name}: Denda ${tile.title} ${toPoinStr(tile.points)}`;
       break;
     case T.START:
-      showInModalOrNotif(`${player.name} di START.`);
+      pointMessage = `${player.name} di START.`;
+      break;
   }
+
+  // Panggil notifikasi SATU KALI, kirim pesan poin DAN pesan edukasi
+  if (pointMessage) {
+     showInModalOrNotif(pointMessage, eduText);
+  }
+
+  // Panggil kuis (jika ada) setelah jeda singkat
+  if (runQuiz) {
+    setTimeout(() => {
+      handleQuiz(player);
+    }, 500); // Beri jeda 0.5 detik sebelum kuis muncul
+  }
+
   updatePlayerLevel(player);
   updatePlayersPanel();
 }
@@ -281,20 +301,28 @@ function resolveTile(player) {
 function fmt(n) { return n.toLocaleString("id-ID"); }
 function toPoinStr(n) { return (n < 0 ? "-" : "+") + " " + Math.abs(n).toLocaleString("id-ID") + " Poin"; }
 
-/* ---------------- notifications ---------------- */
-/* showNotif: bottom fallback (existing) */
-function showNotif(msg, time = 1800) {
-  notifPopup.textContent = msg;
+/* ---------------- notifications (VERSI BARU) ---------------- */
+
+// showNotif sekarang menerima eduMsg dan membuat 2 baris HTML
+function showNotif(msg, eduMsg = "", time = 1800) {
+  let html = `<span>${msg}</span>`; // Baris 1: Pesan Poin
+  if (eduMsg) {
+    html += `<small>${eduMsg}</small>`; // Baris 2: Teks Edukasi
+  }
+  notifPopup.innerHTML = html;
+
+  // Jika ada teks edukasi, tampilkan lebih lama
+  const duration = eduMsg ? 4000 : time; // 4 detik jika ada edukasi
+
   notifPopup.classList.add("show");
   clearTimeout(notifPopup._t);
-  notifPopup._t = setTimeout(() => notifPopup.classList.remove("show"), time);
+  notifPopup._t = setTimeout(() => notifPopup.classList.remove("show"), duration);
 }
 
-/* showInModalOrNotif:
-   - if quizModal is open, show message inside modalNotif (ke atas)
-   - otherwise fallback to bottom notification */
-function showInModalOrNotif(msg, time = 1600) {
+// showInModalOrNotif sekarang meneruskan eduMsg
+function showInModalOrNotif(msg, eduMsg = "", time = 1600) {
   if (quizModal.open) {
+    // Jika modal kuis terbuka, JANGAN tampilkan eduMsg, cukup notif poin
     modalNotif.textContent = msg;
     modalNotif.classList.add("show");
 
@@ -304,20 +332,13 @@ function showInModalOrNotif(msg, time = 1600) {
     }, time);
 
   } else {
-    showNotif(msg);
+    // Jika tidak, tampilkan notif gabungan di tengah
+    showNotif(msg, eduMsg, time);
   }
 }
 
 
-/* ---------------- education popup ---------------- */
-function showEdu(type) {
-  const popup = document.getElementById("eduPopup");
-  const msg = currentEduText[type];
-  if (!msg) return;
-  popup.textContent = msg;
-  popup.classList.add("show");
-  setTimeout(() => popup.classList.remove("show"), 4200);
-}
+
 
 /* ---------------- quiz system (FIXED) ---------------- */
 /*
