@@ -7,7 +7,7 @@
   <title>SmartOne Finance</title>
   <link rel="stylesheet" href="styles.css" />
   <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700&display=swap" rel="stylesheet" />
- 
+
 </head>
 
 <body>
@@ -60,39 +60,37 @@
         </div>
       </div>
 
-      <div id="game-controls">
-        <div id="diceValue" aria-live="polite">Lempar dadu untuk mulai!</div>
-        <button id="rollBtn" disabled>🎲 Lempar Dadu</button>
-      </div>
-    </div>
-  </div>
 
-  <!-- Quiz Modal -->
-  <dialog id="quizModal">
-    <p id="quizQuestion" style="font-weight:700;"></p>
-    <div id="quizChoices"></div>
-    <!-- TEMPAT POPUP NOTIFICATION -->
-    <div id="modalNotif" class="modalNotif"></div>
-    <div class="quiz-footer">
-      <button id="quizSubmit">Jawab</button>
-    </div>
-  </dialog>
+      <!-- Quiz Modal -->
+      <dialog id="quizModal">
+        <p id="quizQuestion" style="font-weight:700;"></p>
+        <div id="quizChoices"></div>
+        <!-- TEMPAT POPUP NOTIFICATION -->
+        <div id="modalNotif" class="modalNotif"></div>
+        <div class="quiz-footer">
+          <button id="quizSubmit">Jawab</button>
+        </div>
+      </dialog>
 
- 
 
-  <!-- fallback notification (bawah layar) -->
-  <div id="notifPopup" class="notif-popup" aria-live="polite"></div>
 
-  <script src="game.js"></script>
-  <script>
-    const screenLanding = document.getElementById("screen-landing");
-    const screenSetup = document.getElementById("screen-setup");
-    const gassMulaiBtn = document.getElementById("gassMulaiBtn");
-    gassMulaiBtn.addEventListener("click", () => {
-      screenLanding.classList.remove("active");
-      screenSetup.classList.add("active");
-    });
-  </script>
+      <!-- fallback notification (bawah layar) -->
+      <div id="notifPopup" class="notif-popup" aria-live="polite"></div>
+
+      <script src="game.js"></script>
+
+      <div id="diceValue" aria-live="polite">Lempar dadu untuk mulai!</div>
+
+      <div id="notifPopup" class="notif-popup" aria-live="polite"></div>
+      <script>
+        const screenLanding = document.getElementById("screen-landing");
+        const screenSetup = document.getElementById("screen-setup");
+        const gassMulaiBtn = document.getElementById("gassMulaiBtn");
+        gassMulaiBtn.addEventListener("click", () => {
+          screenLanding.classList.remove("active");
+          screenSetup.classList.add("active");
+        });
+      </script>
 </body>
 
 </html>

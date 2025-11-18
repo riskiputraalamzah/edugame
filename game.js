@@ -8,7 +8,7 @@ const diceEl = document.getElementById("dice");
 // SmartOne Finance — Versi 4.0 (Sinkron 4-Sudut)
 /* eslint-disable */
 const boardEl = document.getElementById("board");
-const rollBtn = document.getElementById("rollBtn");
+// const rollBtn = document.getElementById("rollBtn");
 const diceValueEl = document.getElementById("diceValue");
 const turnInfoEl = document.getElementById("turnInfo");
 const startBtn = document.getElementById("startBtn");
@@ -508,25 +508,14 @@ function playDiceSound() {
 function scrollToBoard() { if (window.innerWidth > 768) return; boardEl.scrollIntoView({ behavior: "smooth", block: "center" }); }
 function scrollToTurnPanel() { if (window.innerWidth > 768) return; turnInfoEl.scrollIntoView({ behavior: "smooth", block: "center" }); }
 
-/* ---------------- events: roll button & dice click ---------------- */
-rollBtn.addEventListener("click", async () => {
-  if (!started) return;
-  rollBtn.disabled = true;
-  const p = currentPlayer();
-  scrollToBoard();
-  const d = await rollDiceAnimated();
-  diceValueEl.textContent = `${p.name} melempar dadu: ${d}`;
-  await movePlayerAnimated(p, d);
-  nextTurn();
-  setTimeout(scrollToTurnPanel, 1000);
-  rollBtn.disabled = false;
-});
+/* ---------------- events: dice click ---------------- */
+
 
 // <<< new: klik pada dadu juga melempar (sama logic dg tombol) >>>
 diceEl.addEventListener("click", async () => {
   if (!started) return;
   // disable untuk mencegah double click
-  rollBtn.disabled = true;
+  // rollBtn.disabled = true;
   diceEl.setAttribute("aria-disabled", "true");
   const p = currentPlayer();
   scrollToBoard();
@@ -535,7 +524,7 @@ diceEl.addEventListener("click", async () => {
   await movePlayerAnimated(p, d);
   nextTurn();
   setTimeout(scrollToTurnPanel, 1000);
-  rollBtn.disabled = false;
+  // rollBtn.disabled = false;
   diceEl.removeAttribute("aria-disabled");
 });
 
@@ -554,7 +543,7 @@ startBtn.addEventListener("click", () => {
   turn = 0;
   started = true;
   setTurnInfo();
-  rollBtn.disabled = false;
+  diceEl.removeAttribute("aria-disabled");
 
   const screenSetup = document.getElementById("screen-setup");
   const screenGame = document.getElementById("screen-game");
