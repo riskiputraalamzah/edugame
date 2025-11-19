@@ -1,32 +1,32 @@
 /* ======================================================
-   game.js - SmartOne Finance (final: absolute pions)
-   - Perbaikan: quiz modal, notifikasi di modal, klik dadu, safety listeners
+   game.js - SmartOne Journey
+   Logic utama permainan: Board rendering, Player movement,
+   Quiz handling, dan UI updates.
+   [UPDATED: Anti-Spam & Reading Delay]
 ====================================================== */
 
+// --- AMBIL ELEMEN DOM PENTING ---
 const diceEl = document.getElementById("dice");
-
-// SmartOne Finance — Versi 4.0 (Sinkron 4-Sudut)
-/* eslint-disable */
 const boardEl = document.getElementById("board");
-// const rollBtn = document.getElementById("rollBtn");
 const diceValueEl = document.getElementById("diceValue");
 const turnInfoEl = document.getElementById("turnInfo");
 const startBtn = document.getElementById("startBtn");
 const playerCountGroup = document.getElementById("player-count-group");
 const playerChoices = playerCountGroup.querySelectorAll(".btn-choice");
 
+// --- ELEMENT MODAL KUIS ---
 const quizModal = document.getElementById("quizModal");
 const quizQuestion = document.getElementById("quizQuestion");
 const quizChoices = document.getElementById("quizChoices");
 const quizSubmit = document.getElementById("quizSubmit");
-const modalNotif = document.getElementById("modalNotif"); // <<< tempat menampilkan hasil di modal
+const modalNotif = document.getElementById("modalNotif");
 
-// --- MODIFIKASI 1: Ambil Elemen Baru ---
+// --- ELEMENT PEMAIN & PAPAN ---
 const playerInfoBoxes = [
   document.getElementById("player1-info"),
   document.getElementById("player2-info"),
   document.getElementById("player3-info"),
-  document.getElementById("player4-info")
+  document.getElementById("player4-info"),
 ];
 const diceOverlayEl = document.getElementById("diceOverlay");
 const pionEls = [
@@ -36,11 +36,11 @@ const pionEls = [
   document.getElementById("pion4"),
 ];
 const boardWrapper = document.getElementById("board-wrapper");
-const notifPopup = document.getElementById("notifPopup"); // <<< fallback notifikasi di bawah layar
-// --- Akhir Modifikasi 1 ---
+const notifPopup = document.getElementById("notifPopup");
+const sidebarToggleBtn = document.getElementById("sidebar-toggle-btn");
+const playerInfoContainer = document.getElementById("player-info-container");
 
-
-/* ---------------- board shape & path (tidak diubah) ---------------- */
+// --- KONFIGURASI PAPAN ---
 const gridSize = 6;
 const path = [];
 for (let c = 0; c < gridSize; c++) path.push([0, c]);
@@ -58,24 +58,38 @@ const T = {
   PENALTY: "penalty",
 };
 
-/* ---------------- state global ---------------- */
+// --- STATE GLOBAL ---
 let allGameData = null;
 let currentTiles = [];
-let currentQuizBank = [];        // fallback legacy
-let currentQuizLevels = null;    // new: quizLevels
+let currentQuizBank = [];
+let currentQuizLevels = null;
 let currentEduText = {};
 
 const tokenColors = ["#22d3ee", "#fbbf24", "#ef4444", "#22c55e"];
+
 let players = [];
 let selectedPlayerCount = 2;
 let selectedCategoryKey = null;
 let turn = 0;
 let started = false;
 
+// [BARU] Flag untuk mencegah spam klik dadu
+let isProcessingTurn = false;
+
 const LEVEL_THRESHOLDS = { 2: 130000, 3: 300000 };
 const BONUS_BY_LEVEL = { 1: 15000, 2: 8000, 3: 5000 };
 
-/* ---------------- load data ---------------- */
+// --- EVENT LISTENER SIDEBAR ---
+if (sidebarToggleBtn && playerInfoContainer) {
+  sidebarToggleBtn.addEventListener("click", () => {
+    sidebarToggleBtn.classList.toggle("open");
+    playerInfoContainer.classList.toggle("open");
+  });
+}
+
+/* ------------------------------------------------------
+   1. LOAD DATA & SETUP AWAL
+------------------------------------------------------ */
 async function loadGameData() {
   try {
     const response = await fetch("data_game.json");
@@ -86,27 +100,43 @@ async function loadGameData() {
     startBtn.textContent = "Yok Mulai";
   } catch (err) {
     console.error("Gagal memuat data_game.json:", err);
-    turnInfoEl.textContent = "Error: Gagal memuat data. Coba refresh halaman.";
+    turnInfoEl.textContent = "Error: Gagal memuat data.";
   }
 }
 
-/* ---------------- populate kategori (card group) ---------------- */
 function populateCategorySelect() {
   if (!allGameData) return;
   const categoryGroup = document.getElementById("category-card-group");
   categoryGroup.innerHTML = "";
   const categories = Object.keys(allGameData.kategori || {});
+
+  const categoryIcons = {
+    A: "💰",
+    B: "📱",
+    C: "🤝",
+    D: "🏪",
+    E: "🥗",
+    F: "🛡️",
+  };
+
   categories.forEach((key, index) => {
     const card = document.createElement("div");
     card.className = "card-choice";
-    card.textContent = allGameData.kategori[key].nama || key;
+    const namaKategori = allGameData.kategori[key].nama || key;
+    const icon = categoryIcons[key] || "⭐";
+
+    card.innerHTML = `<div class="emoji-icon">${icon}</div><span>${namaKategori}</span>`;
     card.dataset.key = key;
+
     if (index === 0) {
       card.classList.add("selected");
       selectedCategoryKey = key;
     }
+
     card.addEventListener("click", () => {
-      categoryGroup.querySelectorAll(".card-choice").forEach(c => c.classList.remove("selected"));
+      categoryGroup
+        .querySelectorAll(".card-choice")
+        .forEach((c) => c.classList.remove("selected"));
       card.classList.add("selected");
       selectedCategoryKey = card.dataset.key;
     });
@@ -114,10 +144,13 @@ function populateCategorySelect() {
   });
 }
 
-/* ---------------- render board ---------------- */
+/* ------------------------------------------------------
+   2. RENDER BOARD
+------------------------------------------------------ */
 function renderBoard() {
   boardEl.innerHTML = "";
-  diceOverlayEl.style.display = 'none';
+  diceOverlayEl.style.display = "none";
+
   const cells = new Map();
   for (let r = 0; r < gridSize; r++) {
     for (let c = 0; c < gridSize; c++) {
@@ -128,10 +161,16 @@ function renderBoard() {
       cells.set(`${r}-${c}`, cell);
     }
   }
+
   path.forEach((coord, i) => {
     const [r, c] = coord;
     const cell = cells.get(`${r}-${c}`);
-    const t = currentTiles[i % currentTiles.length] || { title: "?", effect: "", type: "income" };
+    const t = currentTiles[i % currentTiles.length] || {
+      title: "?",
+      effect: "",
+      type: "income",
+    };
+
     cell.className = `tile ${t.type}`;
     cell.innerHTML = `
       <div class="title">${t.title}</div>
@@ -140,10 +179,12 @@ function renderBoard() {
   });
 
   setTimeout(placeAllPions, 0);
-  diceOverlayEl.style.display = 'flex';
+  diceOverlayEl.style.display = "flex";
 }
 
-/* ---------------- player management ---------------- */
+/* ------------------------------------------------------
+   3. PLAYER MANAGEMENT
+------------------------------------------------------ */
 function createPlayers(n = 2) {
   players = Array.from({ length: n }).map((_, i) => ({
     id: i,
@@ -154,36 +195,60 @@ function createPlayers(n = 2) {
     savingsPoints: 0,
     laps: 0,
     level: 1,
-    usedQuestions: { 1: new Set(), 2: new Set(), 3: new Set() }
+    usedQuestions: { 1: new Set(), 2: new Set(), 3: new Set() },
   }));
   updatePlayersPanel();
   placeAllPions();
 }
 
 function updatePlayersPanel() {
-  playerInfoBoxes.forEach(box => box.style.display = 'none');
+  playerInfoBoxes.forEach((box) => (box.style.display = "none"));
+
   players.forEach((p, index) => {
     const box = playerInfoBoxes[index];
     if (!box) return;
-    box.style.display = 'block';
+
+    box.style.display = "block";
+    box.style.border = "none";
+
     box.innerHTML = `
-      <strong>${p.name}</strong><br>
-      Level: ${p.level} <br>
-      Skor: ${fmt(p.points)}<br>
-      Tabungan: ${fmt(p.savingsPoints)}<br>
-      Putaran: ${p.laps}`;
-    box.style.borderColor = p.color;
+      <div class="p-header" style="background: ${p.color};">
+        <span>👤 ${p.name}</span>
+        <span style="font-size:0.8em; background:rgba(0,0,0,0.2); padding:2px 6px; border-radius:10px;">
+          ⭐ Lv.${p.level}
+        </span>
+      </div>
+      <div class="p-body">
+        <div class="p-row" style="font-size:0.8em; opacity:0.7; margin-top:6px;">
+          <span>💰 Poin :</span> <span>${fmt(p.points)}</span>
+        </div>
+        <div class="p-row" style="font-size:0.8em; opacity:0.7; margin-top:6px;">
+          <span>🏦 Tabungan :</span> <span>${fmt(p.savingsPoints)}</span>
+        </div>
+        <div class="p-row" style="font-size:0.8em; opacity:0.7; margin-top:6px;">
+          <span>🔄 Putaran: ${p.laps}</span>
+        </div>
+      </div>
+    `;
+    box.style.boxShadow = `0 8px 20px rgba(0,0,0,0.3), 0 0 0 2px ${p.color}`;
   });
 }
 
-function currentPlayer() { return players[turn % players.length]; }
-function nextTurn() { turn = (turn + 1) % players.length; setTurnInfo(); }
+function currentPlayer() {
+  return players[turn % players.length];
+}
+function nextTurn() {
+  turn = (turn + 1) % players.length;
+  setTurnInfo();
+}
 function setTurnInfo() {
   const p = currentPlayer();
-  turnInfoEl.textContent = `Giliran: ${p.name} — Skor ${fmt(p.points)} | Tabungan ${fmt(p.savingsPoints)}`;
+  diceValueEl.textContent = `Giliran ${p.name} melempar dadu!`;
 }
 
-/* ---------------- pion absolute helpers ---------------- */
+/* ------------------------------------------------------
+   4. MOVEMENT LOGIC
+------------------------------------------------------ */
 function tileElementAt(r, c) {
   return boardEl.querySelector(`.tile[data-pos="${r}-${c}"]`);
 }
@@ -191,25 +256,37 @@ function tileElementAt(r, c) {
 function updatePionPosition(player) {
   const pion = pionEls[player.id];
   if (!pion || !boardEl) return;
+
   const idx = player.pos % path.length;
   const [r, c] = path[idx];
   const tile = tileElementAt(r, c);
+
   if (!tile) {
     pion.style.left = `0px`;
     pion.style.top = `0px`;
     return;
   }
+
   const boardRect = boardEl.getBoundingClientRect();
   const tileRect = tile.getBoundingClientRect();
-  const left = tileRect.left - boardRect.left + tileRect.width / 2 - (pion.offsetWidth || 18) / 2;
-  const top = tileRect.top - boardRect.top + tileRect.height / 2 - (pion.offsetHeight || 18) / 2;
+  const left =
+    tileRect.left -
+    boardRect.left +
+    tileRect.width / 2 -
+    (pion.offsetWidth || 32) / 2;
+  const top =
+    tileRect.top -
+    boardRect.top +
+    tileRect.height / 2 -
+    (pion.offsetHeight || 32) / 2;
+
   pion.style.left = `${Math.round(left)}px`;
   pion.style.top = `${Math.round(top)}px`;
 }
 
-playerChoices.forEach(button => {
+playerChoices.forEach((button) => {
   button.addEventListener("click", () => {
-    playerChoices.forEach(btn => btn.classList.remove("selected"));
+    playerChoices.forEach((btn) => btn.classList.remove("selected"));
     button.classList.add("selected");
     selectedPlayerCount = Number(button.dataset.value);
   });
@@ -218,32 +295,40 @@ playerChoices.forEach(button => {
 function placeAllPions() {
   players.forEach((p) => {
     const el = pionEls[p.id];
-    if (el) { el.style.background = p.color; el.style.display = 'block'; }
+    if (el) {
+      el.style.display = "flex";
+    }
     updatePionPosition(p);
   });
   for (let i = players.length; i < pionEls.length; i++) {
-    const el = pionEls[i];
-    if (el) el.style.display = 'none';
+    pionEls[i].style.display = "none";
   }
 }
 
 window.addEventListener("resize", () => {
-  if (typeof window._pionResizeTimeout !== "undefined") clearTimeout(window._pionResizeTimeout);
+  if (typeof window._pionResizeTimeout !== "undefined")
+    clearTimeout(window._pionResizeTimeout);
   window._pionResizeTimeout = setTimeout(() => placeAllPions(), 120);
 });
 
-/* ---------------- gameplay / movement ---------------- */
-function rollDice() { return Math.floor(Math.random() * 6) + 1; }
-function applyStartBonus(player) { player.points += 10000; showInModalOrNotif(`${player.name} melewati START: +10.000 Poin`); }
+/* ------------------------------------------------------
+   5. GAMEPLAY ACTIONS
+------------------------------------------------------ */
+function rollDice() {
+  return Math.floor(Math.random() * 6) + 1;
+}
 
+function applyStartBonus(player) {
+  player.points += 10000;
+  showInModalOrNotif(`${player.name} melewati START: +10.000 Poin`);
+}
 
-// GANTI TOTAL FUNGSI INI
 function resolveTile(player) {
   const tile = currentTiles[player.pos % currentTiles.length];
-  const eduText = currentEduText[tile.type] || ""; // Ambil teks edukasi
+  const eduText = currentEduText[tile.type] || "";
 
-  let pointMessage = ""; 
-  let runQuiz = false; 
+  let pointMessage = "";
+  let runQuiz = false;
 
   switch (tile.type) {
     case T.INCOME:
@@ -271,82 +356,76 @@ function resolveTile(player) {
       break;
     case T.BONUS:
       pointMessage = `${player.name}: ${tile.title}!`;
-      runQuiz = true; 
+      runQuiz = true;
       break;
     case T.PENALTY:
       player.points += tile.points;
-      pointMessage = `${player.name}: Denda ${tile.title} ${toPoinStr(tile.points)}`;
+      pointMessage = `${player.name}: Denda ${tile.title} ${toPoinStr(
+        tile.points
+      )}`;
       break;
     case T.START:
       pointMessage = `${player.name} di START.`;
       break;
   }
 
-  // Panggil notifikasi SATU KALI, kirim pesan poin DAN pesan edukasi
   if (pointMessage) {
-     showInModalOrNotif(pointMessage, eduText);
+    showInModalOrNotif(pointMessage, eduText);
   }
 
-  // Panggil kuis (jika ada) setelah jeda singkat
   if (runQuiz) {
     setTimeout(() => {
       handleQuiz(player);
-    }, 500); // Beri jeda 0.5 detik sebelum kuis muncul
+    }, 500);
   }
 
   updatePlayerLevel(player);
   updatePlayersPanel();
 }
 
-function fmt(n) { return n.toLocaleString("id-ID"); }
-function toPoinStr(n) { return (n < 0 ? "-" : "+") + " " + Math.abs(n).toLocaleString("id-ID") + " Poin"; }
+function fmt(n) {
+  return n.toLocaleString("id-ID");
+}
+function toPoinStr(n) {
+  return (
+    (n < 0 ? "-" : "+") + " " + Math.abs(n).toLocaleString("id-ID") + " Poin"
+  );
+}
 
-/* ---------------- notifications (VERSI BARU) ---------------- */
-
-// showNotif sekarang menerima eduMsg dan membuat 2 baris HTML
-function showNotif(msg, eduMsg = "", time = 1800) {
-  let html = `<span>${msg}</span>`; // Baris 1: Pesan Poin
-  if (eduMsg) {
-    html += `<small>${eduMsg}</small>`; // Baris 2: Teks Edukasi
-  }
+/* ------------------------------------------------------
+   6. NOTIFICATIONS
+------------------------------------------------------ */
+function showNotif(msg, eduMsg = "", time = 1500) {
+  let html = `<span>${msg}</span>`;
+  if (eduMsg) html += `<small>${eduMsg}</small>`;
   notifPopup.innerHTML = html;
 
-  // Jika ada teks edukasi, tampilkan lebih lama
-  const duration = eduMsg ? 4000 : time; // 4 detik jika ada edukasi
+  const duration = eduMsg ? 2500 : time;
 
   notifPopup.classList.add("show");
   clearTimeout(notifPopup._t);
-  notifPopup._t = setTimeout(() => notifPopup.classList.remove("show"), duration);
+  notifPopup._t = setTimeout(
+    () => notifPopup.classList.remove("show"),
+    duration
+  );
 }
 
-// showInModalOrNotif sekarang meneruskan eduMsg
-function showInModalOrNotif(msg, eduMsg = "", time = 1600) {
+function showInModalOrNotif(msg, eduMsg = "", time = 1500) {
   if (quizModal.open) {
-    // Jika modal kuis terbuka, JANGAN tampilkan eduMsg, cukup notif poin
     modalNotif.textContent = msg;
-    modalNotif.classList.add("show");
-
+    modalNotif.style.display = "block";
     clearTimeout(modalNotif._t);
     modalNotif._t = setTimeout(() => {
-      modalNotif.classList.remove("show");
+      modalNotif.style.display = "none";
     }, time);
-
   } else {
-    // Jika tidak, tampilkan notif gabungan di tengah
     showNotif(msg, eduMsg, time);
   }
 }
 
-
-
-
-/* ---------------- quiz system (FIXED) ---------------- */
-/*
- askQuiz(bank)
-  - Menampilkan modal, membangun opsi
-  - Menampilkan hasil (benar/salah) DI DALAM MODAL sebelum menutup
-  - Mengembalikan { answer, correct, item }
-*/
+/* ------------------------------------------------------
+   7. QUIZ SYSTEM
+------------------------------------------------------ */
 function askQuiz(bank, playerLevel = 1) {
   return new Promise((resolve) => {
     const item = bank[Math.floor(Math.random() * bank.length)];
@@ -355,13 +434,10 @@ function askQuiz(bank, playerLevel = 1) {
       return resolve({ answer: null, correct: false, item: null });
     }
 
-    // reset modal UI
-    modalNotif.classList.remove("show");
-    modalNotif.textContent = "";
+    modalNotif.style.display = "none";
     quizQuestion.textContent = item.q;
     quizChoices.innerHTML = "";
 
-    // buat opsi
     item.choices.forEach((c, idx) => {
       const wrapper = document.createElement("label");
       wrapper.className = "quiz-option";
@@ -369,48 +445,53 @@ function askQuiz(bank, playerLevel = 1) {
       quizChoices.appendChild(wrapper);
     });
 
-    // siapkan handler submit (replace tiap panggil)
     quizSubmit.onclick = async (ev) => {
       ev.preventDefault();
-      // baca pilihan saat ini
       const sel = quizChoices.querySelector('input[name="quizOpt"]:checked');
       const answer = sel ? Number(sel.value) : null;
-      const correct = (answer === item.correct);
+      const correct = answer === item.correct;
 
-      // tampilkan hasil di modalNotif (di dalam modal)
       modalNotif.textContent = correct ? `Jawaban benar!` : `Jawaban salah.`;
-      modalNotif.classList.add("show");
+      modalNotif.style.display = "block";
 
-      // tunggu sebentar supaya pengguna lihat (900-1400ms)
-      await new Promise(r => setTimeout(r, 900));
-
-      // sekarang tutup modal dan resolve data
-      try { quizModal.close(); } catch (e) { /* ignore dialog error */ }
+      await new Promise((r) => setTimeout(r, 1000));
+      try {
+        quizModal.close();
+      } catch (e) {}
       resolve({ answer, correct, item });
     };
 
-    // tampilkan modal
-    try { quizModal.showModal(); } catch (e) { console.error("Dialog show error", e); }
-
-    // beri fokus ke modal agar pengguna bisa pakai keyboard
-    setTimeout(() => {
-      const firstInput = quizChoices.querySelector('input[name="quizOpt"]');
-      if (firstInput) firstInput.focus();
-    }, 120);
+    try {
+      quizModal.showModal();
+    } catch (e) {
+      console.error("Dialog error", e);
+    }
   });
 }
 
-/* ---------------- roll & move animations ---------------- */
+/* ------------------------------------------------------
+   8. ANIMATION & FLOW
+------------------------------------------------------ */
 function rollDiceAnimated() {
   return new Promise((resolve) => {
     playDiceSound();
     const result = Math.floor(Math.random() * 6) + 1;
+    const diceContainer = diceEl.querySelector('.dice-container');
+
+    // Hapus kelas hasil sebelumnya
+    for (let i = 1; i <= 6; i++) {
+      diceContainer.classList.remove('show-' + i);
+    }
+
+    // Tambahkan kelas untuk animasi roll
     diceEl.classList.add("roll");
+
     setTimeout(() => {
       diceEl.classList.remove("roll");
-      diceEl.textContent = result;
+      // Tampilkan sisi yang benar
+      diceContainer.classList.add('show-' + result);
       resolve(result);
-    }, 450);
+    }, 800); // Sesuaikan durasi dengan animasi di CSS
   });
 }
 
@@ -419,6 +500,7 @@ async function movePlayerAnimated(player, steps) {
   for (let i = 0; i < steps; i++) {
     const oldPos = player.pos;
     player.pos = (player.pos + 1) % ringLen;
+
     if (player.pos === 0 && oldPos !== 0) {
       player.laps++;
       applyStartBonus(player);
@@ -432,64 +514,50 @@ async function movePlayerAnimated(player, steps) {
   updatePlayersPanel();
 }
 
-/* ---------------- handleQuiz: menggunakan askQuiz yang baru ---------------- */
 async function handleQuiz(player) {
   const level = player.level || 1;
-
   let bank = null;
-  // Logika Anda di sini sudah bagus (menggunakan optional chaining '?')
-  if (currentQuizLevels?.[level]?.length > 0) {
-    bank = currentQuizLevels[level];
-  } else if (currentQuizBank?.length > 0) {
-    bank = currentQuizBank;
-  }
-  
-  // Tambahkan fallback jika level 3 tapi soalnya tidak ada, pakai level 1
-  if (!bank && currentQuizLevels?.["1"]?.length > 0) {
+
+  if (currentQuizLevels?.[level]?.length > 0) bank = currentQuizLevels[level];
+  else if (currentQuizBank?.length > 0) bank = currentQuizBank;
+  if (!bank && currentQuizLevels?.["1"]?.length > 0)
     bank = currentQuizLevels["1"];
-  }
 
   if (!bank || bank.length === 0) {
     showInModalOrNotif("Tidak ada soal untuk level ini.");
     return;
   }
 
-  // ---- MINTA JAWABAN ----
-  // PERBAIKAN DI SINI: Terima 'answer' dan 'correct', bukan 'index'
   const { answer, correct, item } = await askQuiz(bank, level);
 
-  // PERBAIKAN DI SINI: Cek 'answer'
   if (answer === null) {
     showInModalOrNotif(`${player.name} tidak menjawab.`);
     return;
   }
 
-  // ---- CEK JAWABAN ----
-  // PERBAIKAN DI SINI: Cek variabel 'correct'
   if (correct) {
     const bonus = BONUS_BY_LEVEL[level] || BONUS_BY_LEVEL[1];
     player.points += bonus;
-    // Tampilkan notifikasi SETELAH modal ditutup
-    showNotif(`${player.name}: Jawaban benar! +${bonus.toLocaleString("id-ID")} poin`);
+    showNotif(
+      `${player.name}: Jawaban benar! +${bonus.toLocaleString("id-ID")} poin`
+    );
   } else {
     showNotif(`${player.name}: Jawaban salah.`);
   }
 
   updatePlayersPanel();
-  updatePlayerLevel(player); // Pindahkan ini ke sini agar level update setelah kuis
+  updatePlayerLevel(player);
 }
 
-
-
-/* ---------------- highlight landing ---------------- */
 function highlightLanding(index) {
-  const tile = boardEl.querySelector(`.tokens[data-idx="${index}"]`)?.closest(".tile");
+  const tile = boardEl
+    .querySelector(`.tokens[data-idx="${index}"]`)
+    ?.closest(".tile");
   if (!tile) return;
   tile.classList.add("highlight");
   setTimeout(() => tile.classList.remove("highlight"), 1200);
 }
 
-/* ---------------- audio ---------------- */
 function playDiceSound() {
   try {
     const ctx = new (window.AudioContext || window.webkitAudioContext)();
@@ -501,38 +569,57 @@ function playDiceSound() {
     o.connect(g).connect(ctx.destination);
     o.start();
     o.stop(ctx.currentTime + 0.3);
-  } catch (e) { /* ignore */ }
+  } catch (e) {
+    /* ignore */
+  }
 }
 
-/* ---------------- scrolling helpers ---------------- */
-function scrollToBoard() { if (window.innerWidth > 768) return; boardEl.scrollIntoView({ behavior: "smooth", block: "center" }); }
-function scrollToTurnPanel() { if (window.innerWidth > 768) return; turnInfoEl.scrollIntoView({ behavior: "smooth", block: "center" }); }
+/* ------------------------------------------------------
+   9. EVENT LISTENERS & START
+------------------------------------------------------ */
 
-/* ---------------- events: dice click ---------------- */
-
-
-// <<< new: klik pada dadu juga melempar (sama logic dg tombol) >>>
+// === KLIK DADU DENGAN ANTI-SPAM & JEDA ===
 diceEl.addEventListener("click", async () => {
-  if (!started) return;
-  // disable untuk mencegah double click
-  // rollBtn.disabled = true;
+  // 1. GUARD CLAUSE: Cegah klik beruntun/spam
+  if (!started || isProcessingTurn) return;
+
+  // Kunci dadu
+  isProcessingTurn = true;
   diceEl.setAttribute("aria-disabled", "true");
+
   const p = currentPlayer();
   scrollToBoard();
+
+  // 2. Lempar & Jalan
   const d = await rollDiceAnimated();
   diceValueEl.textContent = `${p.name} melempar dadu: ${d}`;
-  await movePlayerAnimated(p, d);
-  nextTurn();
-  setTimeout(scrollToTurnPanel, 1000);
-  // rollBtn.disabled = false;
-  diceEl.removeAttribute("aria-disabled");
-});
 
-/* ---------------- start button (setup -> game) ---------------- */
+  await movePlayerAnimated(p, d);
+
+  // 3. JEDA PENTING (2 Detik)
+  // Memberi waktu baca notifikasi poin/edukasi sebelum ganti pemain
+  await new Promise((resolve) => setTimeout(resolve, 1500));
+
+  // 4. Ganti Giliran & Buka Kunci
+  nextTurn();
+  diceEl.removeAttribute("aria-disabled");
+  isProcessingTurn = false; // Siap untuk klik berikutnya
+
+  setTimeout(scrollToTurnPanel, 500);
+});
+// =============================================
+
+// Klik Tombol Mulai (Start)
 startBtn.addEventListener("click", () => {
   const n = selectedPlayerCount;
   const categoryKey = selectedCategoryKey;
   const selectedCategory = allGameData.kategori[categoryKey] || {};
+
+  const catTitleEl = document.getElementById("categoryTitle");
+  if (catTitleEl) {
+    catTitleEl.textContent = selectedCategory.nama || "Kategori Terpilih";
+  }
+
   currentTiles = selectedCategory.tiles || [];
   currentQuizLevels = selectedCategory.quizLevels || null;
   currentQuizBank = selectedCategory.quizBank || [];
@@ -545,71 +632,99 @@ startBtn.addEventListener("click", () => {
   setTurnInfo();
   diceEl.removeAttribute("aria-disabled");
 
-  const screenSetup = document.getElementById("screen-setup");
-  const screenGame = document.getElementById("screen-game");
-  screenSetup.classList.remove("active");
-  screenGame.classList.add("active");
+  // Reset flag
+  isProcessingTurn = false;
+
+  document.getElementById("screen-setup").classList.remove("active");
+  document.getElementById("screen-game").classList.add("active");
 
   setTimeout(placeAllPions, 150);
 });
 
-/* ---------------- level update ---------------- */
 function updatePlayerLevel(player) {
   const oldLevel = player.level;
   if (player.points >= LEVEL_THRESHOLDS[3]) player.level = 3;
   else if (player.points >= LEVEL_THRESHOLDS[2]) player.level = 2;
   else player.level = 1;
-  if (player.level !== oldLevel) showInModalOrNotif(`${player.name} naik ke LEVEL ${player.level}!`, 1800);
+
+  if (player.level !== oldLevel) {
+    showInModalOrNotif(
+      `${player.name} naik ke LEVEL ${player.level}!`,
+      "",
+      1800
+    );
+  }
 }
 
-/* ---------------- How to Play Modal ---------------- */
+// Tombol Kembali (Back)
+const backBtnGame = document.getElementById("backBtnGame");
+if (backBtnGame) {
+  backBtnGame.addEventListener("click", () => {
+    if (
+      !confirm(
+        "Yakin ingin kembali ke menu utama? Progres permainan akan hilang."
+      )
+    )
+      return;
+
+    document.getElementById("screen-game").classList.remove("active");
+    document.getElementById("screen-setup").classList.add("active");
+
+    started = false;
+    turn = 0;
+    players = [];
+    isProcessingTurn = false;
+    
+    // HAPUS BARIS 'diceEl.textContent = "🎲";' KARENA MENGHANCURKAN STRUKTUR 3D DADU.
+    
+    // PERBAIKAN: Hanya hapus kelas CSS dan reset atribut
+    diceEl.classList.remove("roll");
+    diceEl.removeAttribute("aria-disabled"); // Pastikan dice tidak dalam status 'disabled'
+    
+    // PERBAIKAN: Reset teks instruksi dadu (gunakan diceValueEl, bukan diceEl)
+    diceValueEl.textContent = "Lempar dadu!"; 
+
+    // Reset pion dan info pemain
+    pionEls.forEach((p) => (p.style.display = "none"));
+    playerInfoBoxes.forEach((box) => (box.style.display = "none"));
+  });
+}
+
+const gassMulaiBtn = document.getElementById("gassMulaiBtn");
+if (gassMulaiBtn) {
+  gassMulaiBtn.addEventListener("click", () => {
+    document.getElementById("screen-landing").classList.remove("active");
+    document.getElementById("screen-setup").classList.add("active");
+  });
+}
+
+// Modal Cara Bermain
 const howToPlayModal = document.getElementById("howToPlayModal");
 const howToPlayBtnLanding = document.getElementById("howToPlayBtnLanding");
 const howToPlayBtnGame = document.getElementById("howToPlayBtnGame");
 const closeHowToPlay = document.getElementById("closeHowToPlay");
 const closeHowToPlayBtn = document.getElementById("closeHowToPlayBtn");
 
-// Fungsi untuk membuka modal
 function openHowToPlayModal() {
   try {
-    if (howToPlayModal) {
-      howToPlayModal.showModal();
-    }
-  } catch (e) {
-    console.error("Error opening how to play modal:", e);
-  }
+    howToPlayModal.showModal();
+  } catch (e) {}
 }
-
-// Fungsi untuk menutup modal
 function closeHowToPlayModal() {
   try {
-    if (howToPlayModal) {
-      howToPlayModal.close();
-    }
-  } catch (e) {
-    console.error("Error closing how to play modal:", e);
-  }
+    howToPlayModal.close();
+  } catch (e) {}
 }
 
-// Event listeners untuk tombol buka modal
-if (howToPlayBtnLanding) {
+if (howToPlayBtnLanding)
   howToPlayBtnLanding.addEventListener("click", openHowToPlayModal);
-}
-
-if (howToPlayBtnGame) {
+if (howToPlayBtnGame)
   howToPlayBtnGame.addEventListener("click", openHowToPlayModal);
-}
-
-// Event listeners untuk tombol tutup modal
-if (closeHowToPlay) {
+if (closeHowToPlay)
   closeHowToPlay.addEventListener("click", closeHowToPlayModal);
-}
-
-if (closeHowToPlayBtn) {
+if (closeHowToPlayBtn)
   closeHowToPlayBtn.addEventListener("click", closeHowToPlayModal);
-}
 
-// Tutup modal jika klik di luar modal (backdrop)
 if (howToPlayModal) {
   howToPlayModal.addEventListener("click", (e) => {
     const rect = howToPlayModal.getBoundingClientRect();
@@ -624,19 +739,13 @@ if (howToPlayModal) {
   });
 }
 
-/* ---------------- Navigasi Halaman Awal ---------------- */
-const screenLanding = document.getElementById("screen-landing");
-const screenSetup = document.getElementById("screen-setup");
-const gassMulaiBtn = document.getElementById("gassMulaiBtn");
-
-if (gassMulaiBtn) {
-  gassMulaiBtn.addEventListener("click", () => {
-    screenLanding.classList.remove("active");
-    screenSetup.classList.add("active");
-  });
+function scrollToBoard() {
+  if (window.innerWidth > 768) return;
+  boardEl.scrollIntoView({ behavior: "smooth", block: "center" });
+}
+function scrollToTurnPanel() {
+  if (window.innerWidth > 768) return;
+  turnInfoEl.scrollIntoView({ behavior: "smooth", block: "center" });
 }
 
-
-
-/* ---------------- init ---------------- */
 loadGameData();
